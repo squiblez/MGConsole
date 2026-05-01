@@ -72,7 +72,7 @@ TUI applications render correctly through the VT/ANSI parser, including reverse-
 ### Build
 
 ```bash
-git clone https://github.com/yourname/MGConsole.git
+git clone https://github.com/squiblez/MGConsole.git
 cd MGConsole
 dotnet build
 ```
