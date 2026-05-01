@@ -359,22 +359,18 @@ namespace MGConsole
             string BoxTop() => $"{BrightFg(Cyan)}?{hBar}?{Reset()}";
             string BoxBot() => $"{BrightFg(Cyan)}?{hBar}?{Reset()}";
             string BoxDiv() => $"{BrightFg(Cyan)}?{hBar}?{Reset()}";
-            string BoxMid() => $"{BrightFg(Cyan)}?{pad}?{Reset()}";
 
-            // Centre-pads text to fit inside the box (between the two ? borders).
+            // Row: ? + ' ' + inner + rPad + ?  (3 fixed chars + visLen + rPad = w)
+            // so rPad = w - 3 - visLen (NOT w - 2, which was off-by-one).
             string Row(string label, string value = "", int labelColor = Yellow, int valColor = BrWhite)
             {
                 string inner = value.Length > 0
                     ? $"{BrightFg(labelColor)}{label,-20}{Reset()}{BrightFg(valColor)}{value}{Reset()}"
                     : $"{Bold()}{BrightFg(labelColor)}{label}{Reset()}";
 
-                // Strip ANSI codes to measure visible length for padding.
-                int visible = System.Text.RegularExpressions.Regex.Replace(
-                    label + value, @"\x1B\[[0-9;]*m", "").Length;
-                int labelLen = value.Length > 0 ? 20 : label.Length;
-                int visLen   = (value.Length > 0 ? labelLen : label.Length) + value.Length;
-                int space    = w - 2 - visLen;
-                string rPad  = space > 0 ? new string(' ', space) : "";
+                int visLen = (value.Length > 0 ? 20 : label.Length) + value.Length;
+                int space  = w - 3 - visLen;
+                string rPad = space > 0 ? new string(' ', space) : "";
                 return $"{BrightFg(Cyan)}?{Reset()} {inner}{rPad}{BrightFg(Cyan)}?{Reset()}";
             }
 
@@ -387,68 +383,66 @@ namespace MGConsole
                 return $"{BrightFg(Cyan)}?{Reset()}{new string(' ', lPad)}{BrightFg(color)}{text}{Reset()}{new string(' ', rPad)}{BrightFg(Cyan)}?{Reset()}";
             }
 
+            // Truncate the settings path to fit the value column (w-3 inner, 20 for label).
             string settingsPath = System.IO.Path.Combine(
                 System.IO.Path.GetDirectoryName(Environment.ProcessPath) ?? ".",
                 "settings.json");
+            int maxPathLen = w - 3 - 20;
+            string displayPath = settingsPath.Length <= maxPathLen
+                ? settingsPath
+                : "\u2026" + settingsPath[^(maxPathLen - 1)..];
+
+            var ver = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+            string version = ver != null ? $"v{ver.Major}.{ver.Minor}.{ver.Build}.{ver.Revision}" : "v?.?.?.?";
 
             var sb = new StringBuilder();
+            // ?? Title ????????????????????????????????????????????????????????
             sb.AppendLine(BoxTop());
             sb.AppendLine(Centre($"Welcome to {Bold()}MGConsole{Reset()}", BrCyan));
             sb.AppendLine(Centre("A MonoGame-powered CRT Terminal Emulator", White));
-            sb.AppendLine(BoxMid());
+            sb.AppendLine(Centre(version, Yellow));
+            // ?? Configuration ????????????????????????????????????????????????
             sb.AppendLine(BoxDiv());
-            sb.AppendLine(BoxMid());
             sb.AppendLine(Row("  CONFIGURATION"));
-            sb.AppendLine(Row("  " + midBar[..(w - 4)]));
-            sb.AppendLine(Row("  Settings file:", settingsPath, Yellow, BrWhite));
+            sb.AppendLine(Row("  Settings file:", displayPath, Yellow, BrWhite));
             sb.AppendLine(Row("  Edit in any text editor and restart.", "", White));
             sb.AppendLine(Row("  Your changes are never overwritten.", "", White));
-            sb.AppendLine(BoxMid());
+            // ?? General settings ?????????????????????????????????????????????
             sb.AppendLine(BoxDiv());
-            sb.AppendLine(BoxMid());
             sb.AppendLine(Row("  GENERAL SETTINGS"));
-            sb.AppendLine(Row("  " + midBar[..(w - 4)]));
-            sb.AppendLine(Row("  autoExec",       "Shell or app to launch  (cmd.exe, pwsh.exe…)"));
-            sb.AppendLine(Row("  restartOnExit",  "true = relaunch autoExec, false = quit MGConsole"));
-            sb.AppendLine(Row("  cols / rows",     "Terminal grid dimensions"));
-            sb.AppendLine(Row("  fontScale",       "Glyph size  (1.0 = native, 1.5, 2.0, 2.5…)"));
-            sb.AppendLine(Row("  resizeMode",      "Reflow (adjusts grid)  or  Stretch (scales)"));
-            sb.AppendLine(BoxMid());
+            sb.AppendLine(Row("  autoExec",      "Shell or app to launch  (cmd.exe, pwsh.exe…)"));
+            sb.AppendLine(Row("  restartOnExit", "true = relaunch autoExec, false = quit MGConsole"));
+            sb.AppendLine(Row("  cols / rows",   "Terminal grid dimensions"));
+            sb.AppendLine(Row("  fontScale",     "Glyph size  (1.0 = native, 1.5, 2.0, 2.5…)"));
+            sb.AppendLine(Row("  resizeMode",    "Reflow (adjusts grid)  or  Stretch (scales)"));
+            // ?? CRT effect ???????????????????????????????????????????????????
             sb.AppendLine(BoxDiv());
-            sb.AppendLine(BoxMid());
             sb.AppendLine(Row("  CRT EFFECT"));
-            sb.AppendLine(Row("  " + midBar[..(w - 4)]));
             sb.AppendLine(Row("  crtEffect",         "true / false  — master toggle"));
             sb.AppendLine(Row("  glowIntensity",      "Phosphor bloom  (0.0 = off, ~6.0 strong)"));
             sb.AppendLine(Row("  scanlineIntensity",  "Scanline darkness  (0.0 – 1.0)"));
             sb.AppendLine(Row("  vignetteIntensity",  "Edge darkening  (0.0 – 1.0)"));
-            sb.AppendLine(BoxMid());
+            // ?? CRT waves ????????????????????????????????????????????????????
             sb.AppendLine(BoxDiv());
-            sb.AppendLine(BoxMid());
-            sb.AppendLine(Row("  CRT WAVES (rolling distortion)"));
-            sb.AppendLine(Row("  " + midBar[..(w - 4)]));
-            sb.AppendLine(Row("  waveAmplitude",   "Pixel displacement  (0 = off, 1–3 subtle)"));
-            sb.AppendLine(Row("  waveFrequency",   "Cycles per pixel    (smaller = longer wave)"));
-            sb.AppendLine(Row("  waveSpeed",       "Vertical scroll Hz  (negative = upward)"));
-            sb.AppendLine(Row("  waveSharpness",   "1 = sine, >1 spiky, <1 flat / square"));
-            sb.AppendLine(Row("  waveBrightness",  "Bloom surge along wave crests  (0–5)"));
-            sb.AppendLine(BoxMid());
+            sb.AppendLine(Row("  CRT WAVES  (rolling distortion)"));
+            sb.AppendLine(Row("  waveAmplitude",  "Pixel displacement  (0 = off, 1–3 subtle)"));
+            sb.AppendLine(Row("  waveFrequency",  "Cycles per pixel    (smaller = longer wave)"));
+            sb.AppendLine(Row("  waveSpeed",      "Vertical scroll Hz  (negative = upward)"));
+            sb.AppendLine(Row("  waveSharpness",  "1 = sine, >1 spiky, <1 flat / square"));
+            sb.AppendLine(Row("  waveBrightness", "Bloom surge along wave crests  (0–5)"));
+            // ?? Palette ??????????????????????????????????????????????????????
             sb.AppendLine(BoxDiv());
-            sb.AppendLine(BoxMid());
             sb.AppendLine(Row("  PALETTE"));
-            sb.AppendLine(Row("  " + midBar[..(w - 4)]));
             sb.AppendLine(Row("  16 named colors:", "black, red, green, yellow…", Yellow, BrWhite));
             sb.AppendLine(Row("  Each entry is an", "#RRGGBB hex color string.", Yellow, BrWhite));
-            sb.AppendLine(BoxMid());
+            // ?? Tips ?????????????????????????????????????????????????????????
             sb.AppendLine(BoxDiv());
-            sb.AppendLine(BoxMid());
             sb.AppendLine(Row("  TIPS"));
-            sb.AppendLine(Row("  " + midBar[..(w - 4)]));
-            sb.AppendLine(Row("  • Delete settings.json to regenerate defaults."));
-            sb.AppendLine(Row("  • Set firstRunWelcome:true to see this again."));
-            sb.AppendLine(BoxMid());
+            sb.AppendLine(Row("  \u2022 Delete settings.json to regenerate defaults."));
+            sb.AppendLine(Row("  \u2022 Set firstRunWelcome:true to see this again."));
+            // ?? Footer ???????????????????????????????????????????????????????
             sb.AppendLine(BoxDiv());
-            sb.AppendLine(Centre($"{BrightFg(Green)}Press any key to continue…{Reset()}", Green));
+            sb.AppendLine(Centre($"{BrightFg(Green)}Press any key to continue\u2026{Reset()}", Green));
             sb.AppendLine(BoxBot());
 
             _screen.Feed(sb.ToString().AsSpan());

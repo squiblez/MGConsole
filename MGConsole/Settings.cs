@@ -18,8 +18,8 @@ namespace MGConsole
 
     public sealed class Settings
     {
-        public int Cols { get; set; } = 100;
-        public int Rows { get; set; } = 30;
+        public int Cols { get; set; } = 133;
+        public int Rows { get; set; } = 40;
         public bool Resizable { get; set; } = true;
 
         // Application to launch on startup. Defaults to the Windows command prompt.
