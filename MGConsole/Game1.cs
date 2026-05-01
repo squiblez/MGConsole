@@ -2,6 +2,7 @@ using System;
 using System;
 using System.IO;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -112,11 +113,70 @@ namespace MGConsole
 
         private async Task ReadPtyAsync()
         {
-            var reader = new StreamReader(_pty.Output, Encoding.UTF8);
+            // Capture a local reference so the watcher task is unaffected by
+            // _pty being reassigned during a restart.
+            var pty = _pty;
+
+            void Log(string msg)
+            {
+                System.Diagnostics.Debug.WriteLine("[MGConsole] " + msg);
+                try { Console.Error.WriteLine("[MGConsole] " + msg); } catch { }
+            }
+
+            Log($"ReadPtyAsync started. RestartOnExit = {_settings.RestartOnExit}");
+
+            // Watcher handles EVERYTHING when the child exits: the optional
+            // Environment.Exit, ConPty cleanup, and restart. The read loop is
+            // intentionally NOT part of this flow — closing a FileStream from
+            // another thread does not reliably cancel a pending synchronous
+            // ReadAsync on a Windows pipe handle, so we cannot count on the
+            // read loop unblocking. If the old loop gets orphaned, the new
+            // PTY's loop runs alongside it harmlessly.
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    while (!pty.HasExited) Thread.Sleep(100);
+
+                    Log($"Child process exited. RestartOnExit = {_settings.RestartOnExit}");
+
+                    if (!_settings.RestartOnExit)
+                    {
+                        Log("Hard-exiting application via Environment.Exit(0).");
+                        Environment.Exit(0);
+                        return;
+                    }
+
+                    Log("Restarting child process...");
+                    try { pty.Dispose(); }
+                    catch (Exception ex) { Log("pty.Dispose threw: " + ex.Message); }
+
+                    _pty = null;
+                    _ptyWriter = null;
+
+                    lock (_screenLock)
+                        _screen.ClearAll();
+
+                    StartPty();
+                    Log("New child process started.");
+                }
+                catch (Exception ex)
+                {
+                    Log("Watcher crashed: " + ex);
+                    // If anything goes wrong while restarting, fall back to exiting.
+                    Environment.Exit(1);
+                }
+            });
+
+            // Read loop. Self-terminates when the pipe closes cleanly. If the
+            // sync I/O won't cancel and this loop hangs after the child dies,
+            // it just sits idle — the watcher already restarted (or exited)
+            // the application without depending on it.
+            var reader = new StreamReader(pty.Output, Encoding.UTF8);
             char[] buf = new char[4096];
             try
             {
-                while (!_pty.HasExited)
+                while (true)
                 {
                     int n = await reader.ReadAsync(buf, 0, buf.Length);
                     if (n <= 0) break;
@@ -126,7 +186,12 @@ namespace MGConsole
                     }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Log("Read loop exception (harmless): " + ex.Message);
+            }
+
+            Log("Read loop exited.");
         }
 
         protected override void Update(GameTime gameTime)
@@ -344,6 +409,7 @@ namespace MGConsole
             sb.AppendLine(Row("  GENERAL SETTINGS"));
             sb.AppendLine(Row("  " + midBar[..(w - 4)]));
             sb.AppendLine(Row("  autoExec",       "Shell or app to launch  (cmd.exe, pwsh.exe…)"));
+            sb.AppendLine(Row("  restartOnExit",  "true = relaunch autoExec, false = quit MGConsole"));
             sb.AppendLine(Row("  cols / rows",     "Terminal grid dimensions"));
             sb.AppendLine(Row("  fontScale",       "Glyph size  (1.0 = native, 1.5, 2.0, 2.5…)"));
             sb.AppendLine(Row("  resizeMode",      "Reflow (adjusts grid)  or  Stretch (scales)"));

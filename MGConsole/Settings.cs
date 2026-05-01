@@ -25,6 +25,11 @@ namespace MGConsole
         // Application to launch on startup. Defaults to the Windows command prompt.
         public string AutoExec { get; set; } = "cmd.exe";
 
+        // What to do when the launched process exits.
+        //   true  ? relaunch AutoExec (terminal stays open forever)
+        //   false ? close MGConsole entirely
+        public bool RestartOnExit { get; set; } = true;
+
         // Font scale multiplier — supports fractional values (e.g. 1.5, 2.25).
         // 1.0 = native 8×16 px glyphs. Affects window size, reflow snap, and rendering.
         public float FontScale { get; set; } = 1.0f;

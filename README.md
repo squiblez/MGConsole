@@ -99,6 +99,8 @@ All settings live in **`settings.json`** alongside the `.exe`. The file is creat
   "rows": 30,                  // Terminal height in characters
   "resizable": true,           // Allow window resizing
   "autoExec": "cmd.exe",       // Process to launch on startup
+  "restartOnExit": true,       // true = relaunch autoExec when it exits,
+                               // false = close MGConsole when it exits
   "fontScale": 1.0,            // Glyph scale multiplier (decimals OK: 1.5, 2.25, ...)
   "resizeMode": "Reflow",      // "Reflow" (cols/rows change) or "Stretch" (grid scales)
   "firstRunWelcome": true,     // Show the in-terminal welcome guide on next launch

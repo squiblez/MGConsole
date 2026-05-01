@@ -65,6 +65,12 @@ namespace MGConsole
             Output = new FileStream(new SafeFileHandle(outputReadSide, true), FileAccess.Read);
         }
 
+        public void WaitForExit()
+        {
+            if (_pi.hProcess != IntPtr.Zero)
+                WaitForSingleObject(_pi.hProcess, 0xFFFFFFFF); // INFINITE
+        }
+
         public void Resize(short cols, short rows)
         {
             if (_hPC != IntPtr.Zero)
@@ -73,16 +79,30 @@ namespace MGConsole
 
         public void Dispose()
         {
+            // ConPTY teardown order matters. Per the Microsoft sample / docs:
+            //   1) Close the input WRITE pipe (our side) so ClosePseudoConsole
+            //      doesn't synchronously wait forever for the host to finish
+            //      reading from a still-open input handle.
+            //   2) Close the pseudoconsole — this signals conhost to shut down
+            //      and (if still alive) terminates the client process.
+            //   3) Close the output READ pipe.
+            //   4) Free the attribute list and process/thread handles.
+
             try { Input?.Dispose(); } catch { }
-            try { Output?.Dispose(); } catch { }
+            Input = Stream.Null;
+
             if (_hPC != IntPtr.Zero) { ClosePseudoConsole(_hPC); _hPC = IntPtr.Zero; }
+
+            try { Output?.Dispose(); } catch { }
+            Output = Stream.Null;
+
             if (_attrList != IntPtr.Zero)
             {
                 DeleteProcThreadAttributeList(_attrList);
                 Marshal.FreeHGlobal(_attrList);
                 _attrList = IntPtr.Zero;
             }
-            if (_pi.hThread != IntPtr.Zero) { CloseHandle(_pi.hThread); _pi.hThread = IntPtr.Zero; }
+            if (_pi.hThread  != IntPtr.Zero) { CloseHandle(_pi.hThread);  _pi.hThread  = IntPtr.Zero; }
             if (_pi.hProcess != IntPtr.Zero) { CloseHandle(_pi.hProcess); _pi.hProcess = IntPtr.Zero; }
         }
 
